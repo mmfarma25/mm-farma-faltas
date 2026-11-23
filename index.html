@@ -127,6 +127,7 @@
         id="produto"
         placeholder="Nome do produto em falta"
         autocomplete="off"
+        maxlength="250"
       >
 
       <button id="botaoSalvar" type="button">
@@ -142,6 +143,7 @@
   </main>
 
   <script type="module">
+
     import { initializeApp } from
       "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 
@@ -155,8 +157,7 @@
       "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
     const firebaseConfig = {
-      
-  apiKey: "AIzaSyCwC_Nc_7nYBuS0rFBlLv7Syj8PhbdMbYM",
+      apiKey: "AIzaSyCwC_Nc_7nYBuS0rFBlLv7Syj8PhbdMbYM",
       authDomain: "mm-farma-faltas.firebaseapp.com",
       projectId: "mm-farma-faltas",
       storageBucket: "mm-farma-faltas.firebasestorage.app",
@@ -164,16 +165,18 @@
       appId: "1:849774671234:web:b5857706065a20637b8b9b"
     };
 
+    const URL_SERVIDOR =
+      "https://script.google.com/macros/s/AKfycbxR-C8MOCmdNrwV1nT4Xm8WhWcIFkXfbLU_5ylNuqrojrc13Wks3j26ZYmkW7FYAr2nuQ/exec";
+
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    
     const autorizados = {
-   "nadia.reboucas2@gmail.com": "Nádia",
-   "reboucasmarcol@gmail.com": "Marcos",
-   "mmfarma25@gmail.com": "Administração MM FARMA"
- };
+      "nadia.reboucas2@gmail.com": "Nádia",
+      "reboucasmarcol@gmail.com": "Marcos",
+      "mmfarma25@gmail.com": "Administração MM FARMA"
+    };
 
     const areaLogin =
       document.getElementById("areaLogin");
@@ -196,39 +199,63 @@
     const statusVoz =
       document.getElementById("statusVoz");
 
+    const botaoSalvar =
+      document.getElementById("botaoSalvar");
+
+    const botaoSair =
+      document.getElementById("sair");
+
     let atendenteAtual = null;
     let reconhecimentoAtivo = null;
+    let salvando = false;
+    let acessoNegado = false;
+
+    function mostrarMensagem(texto, cor = "#1565c0") {
+      mensagem.textContent = texto;
+      mensagem.style.color = cor;
+    }
 
     document.getElementById("entrar")
       .addEventListener("click", async () => {
-        mensagem.textContent = "";
+
+        acessoNegado = false;
+        mostrarMensagem("");
 
         try {
           await signInWithPopup(auth, provider);
         } catch (erro) {
-          mensagem.textContent =
-            "Não foi possível entrar: " + erro.code;
+          mostrarMensagem(
+            "Não foi possível entrar: " + erro.code,
+            "#d32f2f"
+          );
         }
       });
 
-    document.getElementById("sair")
-      .addEventListener("click", async () => {
-        try {
-          await signOut(auth);
-        } catch (erro) {
-          mensagem.textContent =
-            "Erro ao sair: " + erro.code;
-        }
-      });
+    botaoSair.addEventListener("click", async () => {
+      try {
+        await signOut(auth);
+      } catch (erro) {
+        mostrarMensagem(
+          "Erro ao sair: " + erro.code,
+          "#d32f2f"
+        );
+      }
+    });
 
     onAuthStateChanged(auth, async (conta) => {
+
       atendenteAtual = null;
       areaApp.style.display = "none";
       areaLogin.style.display = "block";
       campoProduto.value = "";
+      statusVoz.textContent = "";
+
+      if (reconhecimentoAtivo) {
+        reconhecimentoAtivo.abort();
+      }
 
       if (!conta) {
-        mensagem.textContent = "";
+        if (!acessoNegado) mostrarMensagem("");
         return;
       }
 
@@ -237,38 +264,50 @@
 
       const nome = autorizados[email];
 
-      if (!nome) {
-        mensagem.textContent =
-          "Acesso não autorizado para esta conta.";
+      if (!nome || !conta.emailVerified) {
+
+        acessoNegado = true;
+
+        mostrarMensagem(
+          "Acesso não autorizado para esta conta.",
+          "#d32f2f"
+        );
 
         await signOut(auth);
         return;
       }
 
       atendenteAtual = nome;
+
       usuario.textContent =
         "Atendente: " + nome;
 
       areaLogin.style.display = "none";
       areaApp.style.display = "block";
-      mensagem.textContent = "";
+
+      mostrarMensagem("");
     });
 
     botaoVoz.addEventListener("click", () => {
+
+      if (salvando || !atendenteAtual) return;
+
       const SpeechAPI =
         window.SpeechRecognition ||
         window.webkitSpeechRecognition;
 
       if (!SpeechAPI) {
         statusVoz.textContent =
-          "Reconhecimento de voz indisponível.";
+          "Reconhecimento de voz indisponível. Digite o produto.";
         return;
       }
 
       if (reconhecimentoAtivo) return;
 
       try {
+
         const reconhecimento = new SpeechAPI();
+
         reconhecimentoAtivo = reconhecimento;
 
         reconhecimento.lang = "pt-BR";
@@ -276,13 +315,22 @@
         reconhecimento.interimResults = false;
 
         reconhecimento.onstart = () => {
+
           botaoVoz.disabled = true;
+          botaoSalvar.disabled = true;
+
           botaoVoz.textContent = "🎤 Ouvindo...";
+
           statusVoz.textContent =
             "Pode falar o nome do produto.";
+
+          mostrarMensagem("");
         };
 
         reconhecimento.onresult = (evento) => {
+
+          if (!atendenteAtual) return;
+
           campoProduto.value =
             evento.results[0][0].transcript.trim();
 
@@ -291,47 +339,177 @@
         };
 
         reconhecimento.onerror = (evento) => {
+
           statusVoz.textContent =
             "Erro no microfone: " + evento.error;
         };
 
         reconhecimento.onend = () => {
+
           reconhecimentoAtivo = null;
-          botaoVoz.disabled = false;
+          botaoVoz.disabled = salvando;
+          botaoSalvar.disabled = salvando;
           botaoVoz.textContent = "🎤 Falar produto";
         };
 
         reconhecimento.start();
+
       } catch (erro) {
+
         reconhecimentoAtivo = null;
         botaoVoz.disabled = false;
+        botaoSalvar.disabled = false;
         botaoVoz.textContent = "🎤 Falar produto";
+
         statusVoz.textContent =
           "Erro ao iniciar: " + erro.message;
       }
     });
 
-    document.getElementById("botaoSalvar")
-      .addEventListener("click", () => {
-        const produto = campoProduto.value.trim();
+    async function salvarFalta() {
 
-        if (!atendenteAtual) {
-          mensagem.textContent =
-            "Entre com sua conta autorizada.";
-          return;
+      if (salvando || reconhecimentoAtivo) return;
+
+      const produto = campoProduto.value.trim();
+      const conta = auth.currentUser;
+
+      if (!conta || !atendenteAtual) {
+
+        mostrarMensagem(
+          "Entre com sua conta autorizada.",
+          "#d32f2f"
+        );
+
+        return;
+      }
+
+      if (!produto || produto.length > 250) {
+
+        mostrarMensagem(
+          "Informe um nome de produto válido.",
+          "#d32f2f"
+        );
+
+        campoProduto.focus();
+        return;
+      }
+
+      salvando = true;
+
+      botaoSalvar.disabled = true;
+      botaoVoz.disabled = true;
+      botaoSair.disabled = true;
+      campoProduto.disabled = true;
+
+      botaoSalvar.textContent = "Registrando...";
+
+      mostrarMensagem(
+        "Enviando produto para a planilha..."
+      );
+
+      const controlador = new AbortController();
+
+      const limite = setTimeout(
+        () => controlador.abort(),
+        45000
+      );
+
+      try {
+
+        const token = await conta.getIdToken();
+
+        const resposta = await fetch(URL_SERVIDOR, {
+
+          method: "POST",
+
+          headers: {
+            "Content-Type": "text/plain;charset=UTF-8"
+          },
+
+          body: JSON.stringify({
+            token: token,
+            produto: produto
+          }),
+
+          redirect: "follow",
+          credentials: "omit",
+          signal: controlador.signal
+
+        });
+
+        if (!resposta.ok) {
+          throw new Error("Falha na comunicação.");
         }
 
-        if (!produto) {
-          mensagem.textContent =
-            "Informe o nome do produto.";
-          return;
+        const resultado = await resposta.json();
+
+        if (resultado.ok === true) {
+
+          mostrarMensagem(
+            "✅ " + resultado.mensagem,
+            "#188038"
+          );
+
+          campoProduto.value = "";
+          statusVoz.textContent = "";
+
+        } else if (resultado.duplicado === true) {
+
+          mostrarMensagem(
+            "⚠️ Este produto já está na lista de faltas!",
+            "#b26a00"
+          );
+
+        } else {
+
+          mostrarMensagem(
+            resultado.mensagem ||
+            "Não foi possível registrar o produto.",
+            "#d32f2f"
+          );
         }
 
-        mensagem.textContent =
-          "Produto pronto para registro. " +
-          "A conexão segura com a planilha " +
-          "será configurada na próxima etapa.";
-      });
+      } catch (erro) {
+
+        mostrarMensagem(
+          "Não foi possível confirmar o registro. " +
+          "Confira a planilha antes de tentar novamente.",
+          "#d32f2f"
+        );
+
+        console.error("Falha na comunicação:", erro);
+
+      } finally {
+
+        clearTimeout(limite);
+
+        salvando = false;
+
+        botaoSalvar.disabled = false;
+        botaoVoz.disabled = false;
+        botaoSair.disabled = false;
+        campoProduto.disabled = false;
+
+        botaoSalvar.textContent = "Registrar falta";
+      }
+    }
+
+    botaoSalvar.addEventListener(
+      "click",
+      salvarFalta
+    );
+
+    campoProduto.addEventListener(
+      "keydown",
+      (evento) => {
+
+        if (evento.key === "Enter") {
+          evento.preventDefault();
+          salvarFalta();
+        }
+      }
+    );
+
   </script>
 </body>
 </html>
