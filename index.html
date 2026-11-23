@@ -9,9 +9,7 @@
   <title>MM FARMA - Controle de Faltas</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       font-family: Arial, sans-serif;
@@ -31,7 +29,7 @@
     }
 
     h1 {
-      color: #1565C0;
+      color: #1565c0;
       margin-bottom: 5px;
     }
 
@@ -40,7 +38,7 @@
       margin-bottom: 25px;
     }
 
-    select, input, button {
+    input, button {
       width: 100%;
       padding: 15px;
       margin: 10px 0;
@@ -48,9 +46,8 @@
       border-radius: 9px;
     }
 
-    select, input {
+    input {
       border: 1px solid #ccc;
-      background: white;
     }
 
     button {
@@ -60,32 +57,31 @@
       font-weight: bold;
     }
 
-    #botaoVoz {
-      background: #D32F2F;
-    }
-
-    #botaoSalvar {
-      background: #1565C0;
-    }
-
     button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
     }
 
-    #statusVoz, #mensagem {
-      min-height: 24px;
+    #entrar { background: #1565c0; }
+    #sair { background: #666; }
+    #botaoVoz { background: #d32f2f; }
+    #botaoSalvar { background: #1565c0; }
+
+    #areaApp { display: none; }
+
+    #usuario, #statusVoz, #mensagem {
       font-size: 14px;
       line-height: 1.5;
       overflow-wrap: anywhere;
     }
 
-    #statusVoz {
-      color: #555;
+    #usuario {
+      color: #1565c0;
+      font-weight: bold;
     }
 
     #mensagem {
-      color: #1565C0;
+      color: #1565c0;
       font-weight: bold;
     }
 
@@ -98,54 +94,92 @@
 </head>
 
 <body>
-
   <main class="painel">
-
     <h1>MM FARMA</h1>
+
     <p class="subtitulo">
       Controle Inteligente de Faltas
     </p>
 
-    <select id="atendente">
-      <option value="">Selecione o atendente</option>
-      <option value="Nádia">Nádia</option>
-      <option value="Marcos">Marcos</option>
-    </select>
+    <section id="areaLogin">
+      <p>Entre com sua conta Google autorizada.</p>
 
-    <button type="button"
-            id="botaoVoz">
-      🎤 Falar produto
-    </button>
+      <button id="entrar" type="button">
+        Entrar com Google
+      </button>
+    </section>
 
-    <p id="statusVoz" aria-live="polite"></p>
+    <section id="areaApp">
+      <p id="usuario"></p>
 
-    <input type="text"
-           id="produto"
-           placeholder="Nome do produto em falta"
-           autocomplete="off">
+      <button id="sair" type="button">
+        Sair da conta
+      </button>
 
-    <button type="button"
-            id="botaoSalvar">
-      Registrar falta
-    </button>
+      <button id="botaoVoz" type="button">
+        🎤 Falar produto
+      </button>
+
+      <p id="statusVoz" aria-live="polite"></p>
+
+      <input
+        type="text"
+        id="produto"
+        placeholder="Nome do produto em falta"
+        autocomplete="off"
+      >
+
+      <button id="botaoSalvar" type="button">
+        Registrar falta
+      </button>
+    </section>
 
     <p id="mensagem" aria-live="polite"></p>
 
     <p class="rodape">
       MM FARMA — Controle de Faltas
     </p>
-
   </main>
 
-  <script>
-    const botaoVoz =
-      document.getElementById("botaoVoz");
+  <script type="module">
+    import { initializeApp } from
+      "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 
-    const botaoSalvar =
-      document.getElementById("botaoSalvar");
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    } from
+      "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
-    const statusVoz =
-      document.getElementById("statusVoz");
+    const firebaseConfig = {
+      apiKey: "AIzaSyC9xG6rRW5cWT0LFhLF3Nlbaz7H59C1xRQ",
+      authDomain: "mm-farma-faltas.firebaseapp.com",
+      projectId: "mm-farma-faltas",
+      storageBucket: "mm-farma-faltas.firebasestorage.app",
+      messagingSenderId: "849774671234",
+      appId: "1:849774671234:web:b5857706065a20637b8b9b"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    const autorizados = {
+      "nadia.reboucas2@gmail.com": "Nádia",
+      "reboucasmarcol@gmail.com": "Marcos"
+    };
+
+    const areaLogin =
+      document.getElementById("areaLogin");
+
+    const areaApp =
+      document.getElementById("areaApp");
+
+    const usuario =
+      document.getElementById("usuario");
 
     const mensagem =
       document.getElementById("mensagem");
@@ -153,114 +187,148 @@
     const campoProduto =
       document.getElementById("produto");
 
+    const botaoVoz =
+      document.getElementById("botaoVoz");
+
+    const statusVoz =
+      document.getElementById("statusVoz");
+
+    let atendenteAtual = null;
     let reconhecimentoAtivo = null;
 
-    botaoVoz.addEventListener(
-      "click",
-      iniciarVoz
-    );
+    document.getElementById("entrar")
+      .addEventListener("click", async () => {
+        mensagem.textContent = "";
 
-    botaoSalvar.addEventListener(
-      "click",
-      registrarFalta
-    );
+        try {
+          await signInWithPopup(auth, provider);
+        } catch (erro) {
+          mensagem.textContent =
+            "Não foi possível entrar: " + erro.code;
+        }
+      });
 
-    function iniciarVoz() {
+    document.getElementById("sair")
+      .addEventListener("click", async () => {
+        try {
+          await signOut(auth);
+        } catch (erro) {
+          mensagem.textContent =
+            "Erro ao sair: " + erro.code;
+        }
+      });
 
+    onAuthStateChanged(auth, async (conta) => {
+      atendenteAtual = null;
+      areaApp.style.display = "none";
+      areaLogin.style.display = "block";
+      campoProduto.value = "";
+
+      if (!conta) {
+        mensagem.textContent = "";
+        return;
+      }
+
+      const email =
+        (conta.email || "").toLowerCase();
+
+      const nome = autorizados[email];
+
+      if (!nome) {
+        mensagem.textContent =
+          "Acesso não autorizado para esta conta.";
+
+        await signOut(auth);
+        return;
+      }
+
+      atendenteAtual = nome;
+      usuario.textContent =
+        "Atendente: " + nome;
+
+      areaLogin.style.display = "none";
+      areaApp.style.display = "block";
+      mensagem.textContent = "";
+    });
+
+    botaoVoz.addEventListener("click", () => {
       const SpeechAPI =
         window.SpeechRecognition ||
         window.webkitSpeechRecognition;
 
       if (!SpeechAPI) {
         statusVoz.textContent =
-          "Reconhecimento de voz indisponível " +
-          "neste navegador.";
+          "Reconhecimento de voz indisponível.";
         return;
       }
 
-      if (reconhecimentoAtivo) {
-        return;
-      }
+      if (reconhecimentoAtivo) return;
 
       try {
         const reconhecimento = new SpeechAPI();
-
         reconhecimentoAtivo = reconhecimento;
 
         reconhecimento.lang = "pt-BR";
         reconhecimento.continuous = false;
         reconhecimento.interimResults = false;
 
-        reconhecimento.onstart = function() {
+        reconhecimento.onstart = () => {
           botaoVoz.disabled = true;
           botaoVoz.textContent = "🎤 Ouvindo...";
-
           statusVoz.textContent =
             "Pode falar o nome do produto.";
         };
 
-        reconhecimento.onresult = function(evento) {
-          const texto =
-            evento.results[0][0].transcript;
-
-          campoProduto.value = texto.trim();
+        reconhecimento.onresult = (evento) => {
+          campoProduto.value =
+            evento.results[0][0].transcript.trim();
 
           statusVoz.textContent =
             "✅ Produto reconhecido! Confira o nome.";
         };
 
-        reconhecimento.onerror = function(evento) {
+        reconhecimento.onerror = (evento) => {
           statusVoz.textContent =
-            "Erro no reconhecimento de voz: " +
-            evento.error;
+            "Erro no microfone: " + evento.error;
         };
 
-        reconhecimento.onend = function() {
+        reconhecimento.onend = () => {
           reconhecimentoAtivo = null;
           botaoVoz.disabled = false;
           botaoVoz.textContent = "🎤 Falar produto";
         };
 
         reconhecimento.start();
-
       } catch (erro) {
         reconhecimentoAtivo = null;
         botaoVoz.disabled = false;
         botaoVoz.textContent = "🎤 Falar produto";
-
         statusVoz.textContent =
-          "Não foi possível iniciar: " +
-          erro.message;
+          "Erro ao iniciar: " + erro.message;
       }
-    }
+    });
 
-    function registrarFalta() {
-      const atendente =
-        document.getElementById("atendente").value;
+    document.getElementById("botaoSalvar")
+      .addEventListener("click", () => {
+        const produto = campoProduto.value.trim();
 
-      const produto = campoProduto.value.trim();
+        if (!atendenteAtual) {
+          mensagem.textContent =
+            "Entre com sua conta autorizada.";
+          return;
+        }
 
-      if (!atendente) {
+        if (!produto) {
+          mensagem.textContent =
+            "Informe o nome do produto.";
+          return;
+        }
+
         mensagem.textContent =
-          "Selecione o atendente.";
-        return;
-      }
-
-      if (!produto) {
-        mensagem.textContent =
-          "Informe o nome do produto.";
-        return;
-      }
-
-      // A conexão com o Google Planilhas
-      // será configurada na próxima etapa.
-      mensagem.textContent =
-        "Produto preenchido corretamente. " +
-        "A conexão com a planilha ainda " +
-        "precisa ser configurada.";
-    }
+          "Produto pronto para registro. " +
+          "A conexão segura com a planilha " +
+          "será configurada na próxima etapa.";
+      });
   </script>
-
 </body>
 </html>
-
