@@ -1,1 +1,266 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>MM FARMA - Controle de Faltas</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f5fa;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .painel {
+      background: white;
+      max-width: 430px;
+      margin: 30px auto;
+      padding: 25px;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px #0002;
+    }
+
+    h1 {
+      color: #1565C0;
+      margin-bottom: 5px;
+    }
+
+    .subtitulo {
+      color: #555;
+      margin-bottom: 25px;
+    }
+
+    select, input, button {
+      width: 100%;
+      padding: 15px;
+      margin: 10px 0;
+      font-size: 16px;
+      border-radius: 9px;
+    }
+
+    select, input {
+      border: 1px solid #ccc;
+      background: white;
+    }
+
+    button {
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #botaoVoz {
+      background: #D32F2F;
+    }
+
+    #botaoSalvar {
+      background: #1565C0;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #statusVoz, #mensagem {
+      min-height: 24px;
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    #statusVoz {
+      color: #555;
+    }
+
+    #mensagem {
+      color: #1565C0;
+      font-weight: bold;
+    }
+
+    .rodape {
+      margin-top: 25px;
+      font-size: 12px;
+      color: #888;
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="painel">
+
+    <h1>MM FARMA</h1>
+    <p class="subtitulo">
+      Controle Inteligente de Faltas
+    </p>
+
+    <select id="atendente">
+      <option value="">Selecione o atendente</option>
+      <option value="Nádia">Nádia</option>
+      <option value="Marcos">Marcos</option>
+    </select>
+
+    <button type="button"
+            id="botaoVoz">
+      🎤 Falar produto
+    </button>
+
+    <p id="statusVoz" aria-live="polite"></p>
+
+    <input type="text"
+           id="produto"
+           placeholder="Nome do produto em falta"
+           autocomplete="off">
+
+    <button type="button"
+            id="botaoSalvar">
+      Registrar falta
+    </button>
+
+    <p id="mensagem" aria-live="polite"></p>
+
+    <p class="rodape">
+      MM FARMA — Controle de Faltas
+    </p>
+
+  </main>
+
+  <script>
+    const botaoVoz =
+      document.getElementById("botaoVoz");
+
+    const botaoSalvar =
+      document.getElementById("botaoSalvar");
+
+    const statusVoz =
+      document.getElementById("statusVoz");
+
+    const mensagem =
+      document.getElementById("mensagem");
+
+    const campoProduto =
+      document.getElementById("produto");
+
+    let reconhecimentoAtivo = null;
+
+    botaoVoz.addEventListener(
+      "click",
+      iniciarVoz
+    );
+
+    botaoSalvar.addEventListener(
+      "click",
+      registrarFalta
+    );
+
+    function iniciarVoz() {
+
+      const SpeechAPI =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+      if (!SpeechAPI) {
+        statusVoz.textContent =
+          "Reconhecimento de voz indisponível " +
+          "neste navegador.";
+        return;
+      }
+
+      if (reconhecimentoAtivo) {
+        return;
+      }
+
+      try {
+        const reconhecimento = new SpeechAPI();
+
+        reconhecimentoAtivo = reconhecimento;
+
+        reconhecimento.lang = "pt-BR";
+        reconhecimento.continuous = false;
+        reconhecimento.interimResults = false;
+
+        reconhecimento.onstart = function() {
+          botaoVoz.disabled = true;
+          botaoVoz.textContent = "🎤 Ouvindo...";
+
+          statusVoz.textContent =
+            "Pode falar o nome do produto.";
+        };
+
+        reconhecimento.onresult = function(evento) {
+          const texto =
+            evento.results[0][0].transcript;
+
+          campoProduto.value = texto.trim();
+
+          statusVoz.textContent =
+            "✅ Produto reconhecido! Confira o nome.";
+        };
+
+        reconhecimento.onerror = function(evento) {
+          statusVoz.textContent =
+            "Erro no reconhecimento de voz: " +
+            evento.error;
+        };
+
+        reconhecimento.onend = function() {
+          reconhecimentoAtivo = null;
+          botaoVoz.disabled = false;
+          botaoVoz.textContent = "🎤 Falar produto";
+        };
+
+        reconhecimento.start();
+
+      } catch (erro) {
+        reconhecimentoAtivo = null;
+        botaoVoz.disabled = false;
+        botaoVoz.textContent = "🎤 Falar produto";
+
+        statusVoz.textContent =
+          "Não foi possível iniciar: " +
+          erro.message;
+      }
+    }
+
+    function registrarFalta() {
+      const atendente =
+        document.getElementById("atendente").value;
+
+      const produto = campoProduto.value.trim();
+
+      if (!atendente) {
+        mensagem.textContent =
+          "Selecione o atendente.";
+        return;
+      }
+
+      if (!produto) {
+        mensagem.textContent =
+          "Informe o nome do produto.";
+        return;
+      }
+
+      // A conexão com o Google Planilhas
+      // será configurada na próxima etapa.
+      mensagem.textContent =
+        "Produto preenchido corretamente. " +
+        "A conexão com a planilha ainda " +
+        "precisa ser configurada.";
+    }
+  </script>
+
+</body>
+</html>
+
